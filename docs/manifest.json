@@ -4,6 +4,8 @@
       "id": "progit",
       "type": "book",
       "title": "progit",
+      "author": null,
+      "summary": null,
       "tags": [],
       "featured": false,
       "source": "progit.pdf",
@@ -11,6 +13,19 @@
       "updated_at": "2026-03-27T07:42:02Z",
       "chapters_count": 21,
       "word_count": 142694
+    },
+    {
+      "id": "sandbox-3bc3-clock-app",
+      "type": "site",
+      "title": "sandbox_3bc3_clock-app",
+      "author": null,
+      "summary": null,
+      "tags": [],
+      "featured": false,
+      "source": "sandbox_3bc3_clock-app.zip",
+      "created_at": "2026-04-01T14:35:49Z",
+      "updated_at": "2026-04-01T14:35:49Z",
+      "entry": "sites/sandbox-3bc3-clock-app/index.html"
     }
   ]
 }
