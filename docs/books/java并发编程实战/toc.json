@@ -1,0 +1,420 @@
+{
+  "title": "Java并发编程实战华章专业开发者书库",
+  "children": [
+    {
+      "title": "对本书的赞誉",
+      "slug": "对本书的赞誉",
+      "href": "EPUB/text00001.html"
+    },
+    {
+      "title": "译者序",
+      "slug": "译者序",
+      "href": "EPUB/text00002.html"
+    },
+    {
+      "title": "前言",
+      "slug": "前言",
+      "href": "EPUB/text00003.html"
+    },
+    {
+      "title": "第1章 简介",
+      "slug": "第1章-简介",
+      "href": "EPUB/text00004.html"
+    },
+    {
+      "title": "1.1 并发简史",
+      "slug": "1-1-并发简史",
+      "href": "EPUB/text00004.html"
+    },
+    {
+      "title": "1.2 线程的优势",
+      "slug": "1-2-线程的优势",
+      "href": "EPUB/text00005.html"
+    },
+    {
+      "title": "1.2.1 发挥多处理器的强大能力",
+      "slug": "1-2-1-发挥多处理器的强大能力",
+      "href": "EPUB/text00005.html"
+    },
+    {
+      "title": "1.2.2 建模的简单性",
+      "slug": "1-2-2-建模的简单性",
+      "href": "EPUB/text00006.html"
+    },
+    {
+      "title": "1.2.3 异步事件的简化处理",
+      "slug": "1-2-3-异步事件的简化处理",
+      "href": "EPUB/text00007.html"
+    },
+    {
+      "title": "1.2.4 响应更灵敏的用户界面",
+      "slug": "1-2-4-响应更灵敏的用户界面",
+      "href": "EPUB/text00008.html"
+    },
+    {
+      "title": "1.3 线程带来的风险",
+      "slug": "1-3-线程带来的风险",
+      "href": "EPUB/text00009.html"
+    },
+    {
+      "title": "1.3.1 安全性问题",
+      "slug": "1-3-1-安全性问题",
+      "href": "EPUB/text00009.html"
+    },
+    {
+      "title": "1.3.2 活跃性问题",
+      "slug": "1-3-2-活跃性问题",
+      "href": "EPUB/text00010.html"
+    },
+    {
+      "title": "1.3.3 性能问题",
+      "slug": "1-3-3-性能问题",
+      "href": "EPUB/text00011.html"
+    },
+    {
+      "title": "1.4 线程无处不在",
+      "slug": "1-4-线程无处不在",
+      "href": "EPUB/text00012.html"
+    },
+    {
+      "title": "第一部分 基础知识",
+      "slug": "第一部分-基础知识",
+      "href": "EPUB/text00013.html"
+    },
+    {
+      "title": "第2章 线程安全性",
+      "slug": "第2章-线程安全性",
+      "href": "EPUB/text00013.html"
+    },
+    {
+      "title": "2.1 什么是线程安全性",
+      "slug": "2-1-什么是线程安全性",
+      "href": "EPUB/text00013.html"
+    },
+    {
+      "title": "2.2 原子性",
+      "slug": "2-2-原子性",
+      "href": "EPUB/text00014.html"
+    },
+    {
+      "title": "2.2.1 竞态条件",
+      "slug": "2-2-1-竞态条件",
+      "href": "EPUB/text00014.html"
+    },
+    {
+      "title": "2.2.2 示例：延迟初始化中的竞态条件",
+      "slug": "2-2-2-示例-延迟初始化中的竞态条件",
+      "href": "EPUB/text00015.html"
+    },
+    {
+      "title": "2.2.3 复合操作",
+      "slug": "2-2-3-复合操作",
+      "href": "EPUB/text00016.html"
+    },
+    {
+      "title": "2.3 加锁机制",
+      "slug": "2-3-加锁机制",
+      "href": "EPUB/text00017.html"
+    },
+    {
+      "title": "2.3.1 内置锁",
+      "slug": "2-3-1-内置锁",
+      "href": "EPUB/text00017.html"
+    },
+    {
+      "title": "2.3.2 重入",
+      "slug": "2-3-2-重入",
+      "href": "EPUB/text00018.html"
+    },
+    {
+      "title": "2.4 用锁来保护状态",
+      "slug": "2-4-用锁来保护状态",
+      "href": "EPUB/text00019.html"
+    },
+    {
+      "title": "2.5 活跃性与性能",
+      "slug": "2-5-活跃性与性能",
+      "href": "EPUB/text00020.html"
+    },
+    {
+      "title": "第3章 对象的共享",
+      "slug": "第3章-对象的共享",
+      "href": "EPUB/text00021.html"
+    },
+    {
+      "title": "3.1 可见性",
+      "slug": "3-1-可见性",
+      "href": "EPUB/text00021.html"
+    },
+    {
+      "title": "3.1.1 失效数据",
+      "slug": "3-1-1-失效数据",
+      "href": "EPUB/text00022.html"
+    },
+    {
+      "title": "3.1.2 非原子的64位操作",
+      "slug": "3-1-2-非原子的64位操作",
+      "href": "EPUB/text00022.html"
+    },
+    {
+      "title": "3.1.3 加锁与可见性",
+      "slug": "3-1-3-加锁与可见性",
+      "href": "EPUB/text00023.html"
+    },
+    {
+      "title": "3.1.4 Volatile变量",
+      "slug": "3-1-4-volatile变量",
+      "href": "EPUB/text00024.html"
+    },
+    {
+      "title": "3.2 发布与逸出",
+      "slug": "3-2-发布与逸出",
+      "href": "EPUB/text00025.html"
+    },
+    {
+      "title": "3.3 线程封闭",
+      "slug": "3-3-线程封闭",
+      "href": "EPUB/text00026.html"
+    },
+    {
+      "title": "3.3.1 Ad-hoc线程封闭",
+      "slug": "3-3-1-ad-hoc线程封闭",
+      "href": "EPUB/text00027.html"
+    },
+    {
+      "title": "3.3.2 栈封闭",
+      "slug": "3-3-2-栈封闭",
+      "href": "EPUB/text00027.html"
+    },
+    {
+      "title": "3.3.3 ThreadLocal类",
+      "slug": "3-3-3-threadlocal类",
+      "href": "EPUB/text00028.html"
+    },
+    {
+      "title": "3.4 不变性",
+      "slug": "3-4-不变性",
+      "href": "EPUB/text00029.html"
+    },
+    {
+      "title": "3.4.1 Final域",
+      "slug": "3-4-1-final域",
+      "href": "EPUB/text00030.html"
+    },
+    {
+      "title": "3.4.2 示例：使用Volatile类型来发布不可变对象",
+      "slug": "3-4-2-示例-使用volatile类型来发布不可变对象",
+      "href": "EPUB/text00030.html"
+    },
+    {
+      "title": "3.5 安全发布",
+      "slug": "3-5-安全发布",
+      "href": "EPUB/text00031.html"
+    },
+    {
+      "title": "3.5.1 不正确的发布：正确的对象被破坏",
+      "slug": "3-5-1-不正确的发布-正确的对象被破坏",
+      "href": "EPUB/text00031.html"
+    },
+    {
+      "title": "3.5.2 不可变对象与初始化安全性",
+      "slug": "3-5-2-不可变对象与初始化安全性",
+      "href": "EPUB/text00032.html"
+    },
+    {
+      "title": "3.5.3 安全发布的常用模式",
+      "slug": "3-5-3-安全发布的常用模式",
+      "href": "EPUB/text00033.html"
+    },
+    {
+      "title": "3.5.4 事实不可变对象",
+      "slug": "3-5-4-事实不可变对象",
+      "href": "EPUB/text00034.html"
+    },
+    {
+      "title": "3.5.5 可变对象",
+      "slug": "3-5-5-可变对象",
+      "href": "EPUB/text00035.html"
+    },
+    {
+      "title": "3.5.6 安全地共享对象",
+      "slug": "3-5-6-安全地共享对象",
+      "href": "EPUB/text00036.html"
+    },
+    {
+      "title": "第4章 对象的组合",
+      "slug": "第4章-对象的组合",
+      "href": "EPUB/text00037.html"
+    },
+    {
+      "title": "4.1 设计线程安全的类",
+      "slug": "4-1-设计线程安全的类",
+      "href": "EPUB/text00037.html"
+    },
+    {
+      "title": "4.1.1 收集同步需求",
+      "slug": "4-1-1-收集同步需求",
+      "href": "EPUB/text00038.html"
+    },
+    {
+      "title": "4.1.2 依赖状态的操作",
+      "slug": "4-1-2-依赖状态的操作",
+      "href": "EPUB/text00038.html"
+    },
+    {
+      "title": "4.1.3 状态的所有权",
+      "slug": "4-1-3-状态的所有权",
+      "href": "EPUB/text00039.html"
+    },
+    {
+      "title": "4.2 实例封闭",
+      "slug": "4-2-实例封闭",
+      "href": "EPUB/text00040.html"
+    },
+    {
+      "title": "4.2.1 Java监视器模式",
+      "slug": "4-2-1-java监视器模式",
+      "href": "EPUB/text00041.html"
+    },
+    {
+      "title": "4.2.2 示例：车辆追踪",
+      "slug": "4-2-2-示例-车辆追踪",
+      "href": "EPUB/text00041.html"
+    },
+    {
+      "title": "4.3 线程安全性的委托",
+      "slug": "4-3-线程安全性的委托",
+      "href": "EPUB/text00042.html"
+    },
+    {
+      "title": "4.3.1 示例：基于委托的车辆追踪器",
+      "slug": "4-3-1-示例-基于委托的车辆追踪器",
+      "href": "EPUB/text00042.html"
+    },
+    {
+      "title": "4.3.2 独立的状态变量",
+      "slug": "4-3-2-独立的状态变量",
+      "href": "EPUB/text00043.html"
+    },
+    {
+      "title": "4.3.3 当委托失效时",
+      "slug": "4-3-3-当委托失效时",
+      "href": "EPUB/text00044.html"
+    },
+    {
+      "title": "4.3.4 发布底层的状态变量",
+      "slug": "4-3-4-发布底层的状态变量",
+      "href": "EPUB/text00045.html"
+    },
+    {
+      "title": "4.3.5 示例：发布状态的车辆追踪器",
+      "slug": "4-3-5-示例-发布状态的车辆追踪器",
+      "href": "EPUB/text00046.html"
+    },
+    {
+      "title": "4.4 在现有的线程安全类中添加功能",
+      "slug": "4-4-在现有的线程安全类中添加功能",
+      "href": "EPUB/text00047.html"
+    },
+    {
+      "title": "4.4.1 客户端加锁机制",
+      "slug": "4-4-1-客户端加锁机制",
+      "href": "EPUB/text00047.html"
+    },
+    {
+      "title": "4.4.2 组合",
+      "slug": "4-4-2-组合",
+      "href": "EPUB/text00048.html"
+    },
+    {
+      "title": "4.5 将同步策略文档化",
+      "slug": "4-5-将同步策略文档化",
+      "href": "EPUB/text00049.html"
+    },
+    {
+      "title": "第5章 基础构建模块",
+      "slug": "第5章-基础构建模块",
+      "href": "EPUB/text00050.html"
+    },
+    {
+      "title": "5.1 同步容器类",
+      "slug": "5-1-同步容器类",
+      "href": "EPUB/text00050.html"
+    },
+    {
+      "title": "5.1.1 同步容器类的问题",
+      "slug": "5-1-1-同步容器类的问题",
+      "href": "EPUB/text00050.html"
+    },
+    {
+      "title": "5.1.2 迭代器与ConcurrentModificationException",
+      "slug": "5-1-2-迭代器与concurrentmodificationexception",
+      "href": "EPUB/text00051.html"
+    },
+    {
+      "title": "5.1.3 隐藏迭代器",
+      "slug": "5-1-3-隐藏迭代器",
+      "href": "EPUB/text00052.html"
+    },
+    {
+      "title": "5.2 并发容器",
+      "slug": "5-2-并发容器",
+      "href": "EPUB/text00053.html"
+    },
+    {
+      "title": "5.2.1 ConcurrentHashMap",
+      "slug": "5-2-1-concurrenthashmap",
+      "href": "EPUB/text00053.html"
+    },
+    {
+      "title": "5.2.2 额外的原子Map操作",
+      "slug": "5-2-2-额外的原子map操作",
+      "href": "EPUB/text00054.html"
+    },
+    {
+      "title": "5.2.3 CopyOnWriteArrayList",
+      "slug": "5-2-3-copyonwritearraylist",
+      "href": "EPUB/text00055.html"
+    },
+    {
+      "title": "5.3 阻塞队列和生产者-消费者模式",
+      "slug": "5-3-阻塞队列和生产者-消费者模式",
+      "href": "EPUB/text00056.html"
+    },
+    {
+      "title": "5.3.1 示例：桌面搜索",
+      "slug": "5-3-1-示例-桌面搜索",
+      "href": "EPUB/text00057.html"
+    },
+    {
+      "title": "5.3.2 串行线程封闭",
+      "slug": "5-3-2-串行线程封闭",
+      "href": "EPUB/text00057.html"
+    },
+    {
+      "title": "5.3.3 双端队列与工作密取",
+      "slug": "5-3-3-双端队列与工作密取",
+      "href": "EPUB/text00058.html"
+    },
+    {
+      "title": "5.4 阻塞方法与中断方法",
+      "slug": "5-4-阻塞方法与中断方法",
+      "href": "EPUB/text00059.html"
+    },
+    {
+      "title": "5.5 同步工具类",
+      "slug": "5-5-同步工具类",
+      "href": "EPUB/text00060.html"
+    },
+    {
+      "title": "5.5.1 闭锁",
+      "slug": "5-5-1-闭锁",
+      "href": "EPUB/text00060.html"
+    },
+    {
+      "title": "5.5.2 FutureTask",
+      "slug": "5-5-2-futuretask",
+      "href": "EPUB/text00061.html"
+    }
+  ]
+}
