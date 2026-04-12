@@ -4,6 +4,8 @@
       "id": "progit",
       "type": "book",
       "title": "progit",
+      "author": null,
+      "summary": null,
       "tags": [],
       "featured": false,
       "source": "progit.pdf",

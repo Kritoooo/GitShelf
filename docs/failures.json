@@ -1,0 +1,10 @@
+{
+  "failures": [
+    {
+      "filename": "Java并发编程实战 _ Java concurrency in practice _ Brian Goetz [and -- (美)盖茨等著 -- 1, 2012 -- 北京_机械工业出版社 -- isbn13 9787111370048 -- 89bc7a3fa8f41c3c741cbcc00b8acded -- Anna’s Archive.pdf",
+      "book_id": "java并发编程实战-java-concurrency-in-practice-brian-goetz-and-美-盖茨等著-1-2012-北京-机械工业出版社-isbn13-9787111370048-89bc7a3fa8f41c3c741cbcc00b8acded-anna-s-archive",
+      "error": "MinerU API returned error during request upload URL: code=-10002 msg=field \"files.data_id\" cannot exceed 128 characters url=https://mineru.net/api/v4/file-urls/batch",
+      "failed_at": "2026-04-12T06:41:44Z"
+    }
+  ]
+}
