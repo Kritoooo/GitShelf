@@ -193,6 +193,7 @@ def _write_book_metadata(
         "id": book_id,
         "type": "book",
         "source": source_pdf,
+        "source_format": "markdown-derived",
         "pdf_md5": pdf_md5,
         "page_count": page_count,
         "created_at": created_at,

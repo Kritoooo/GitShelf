@@ -44,9 +44,9 @@ export function BookOverview({ bookId, onTocLoaded }) {
   }
 
   const items = tocData.children;
-  const totalChapters = items.length;
+  const totalChapters = bookMeta?.chapters_count || items.length;
   const wordCount = bookMeta?.word_count || 0;
-  const firstChapter = items[0];
+  const firstChapter = items.find((item) => item.slug) || null;
   const encodedBookId = encodeURIComponent(bookId);
 
   return (

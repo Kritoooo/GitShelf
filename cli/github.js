@@ -105,6 +105,7 @@ function normalizeItem(raw) {
     visibility: normalizeVisibility(m.visibility),
     chapters_count: nullNum(m.chapters_count),
     word_count: nullNum(m.word_count),
+    source_format: String(m.source_format || '').trim() || null,
     created_at: String(m.created_at || '').trim() || null,
     updated_at: String(m.updated_at || m.created_at || '').trim() || null,
     source: String(m.source || '').trim() || null,
@@ -241,7 +242,7 @@ function buildPublicManifest(items) {
   return {
     items: pub.map((b) => {
       const r = { id: b.id, type: b.type, title: getDisplayTitle(b), author: b.author || undefined, summary: b.summary || undefined, tags: b.tags, featured: b.featured, source: b.source, created_at: b.created_at, updated_at: b.updated_at };
-      if (b.type === 'book') { r.chapters_count = b.chapters_count; r.word_count = b.word_count; }
+      if (b.type === 'book') { r.chapters_count = b.chapters_count; r.word_count = b.word_count; r.source_format = b.source_format || undefined; }
       else if (b.type === 'doc') { r.word_count = b.word_count; }
       else if (b.type === 'site') { r.entry = b.entry; }
       return r;
@@ -258,7 +259,8 @@ function serializeCatalog(items) {
       author: b.author || '', summary: b.summary || '', tags: b.tags || [],
       featured: b.featured, manual_order: b.manual_order,
       visibility: normalizeVisibility(b.visibility), source: b.source || '',
-      entry: b.entry || undefined, chapters_count: b.chapters_count, word_count: b.word_count,
+      entry: b.entry || undefined, source_format: b.source_format || undefined,
+      chapters_count: b.chapters_count, word_count: b.word_count,
       created_at: b.created_at, updated_at: b.updated_at,
     })),
   };
