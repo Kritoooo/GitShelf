@@ -4,7 +4,7 @@
 
 GitHub-hosted content shelf. Fork, upload, done.
 
-> Fork this repo to get your own content platform on GitHub Pages. Upload PDFs or EPUBs (auto-converted to books), Markdown documents (rendered directly), or ZIP archives (deployed as static sites). Zero server cost.
+> Fork this repo to get your own content platform on GitHub Pages. Upload PDFs or EPUBs (published as online books), Markdown documents (rendered directly), or ZIP archives (deployed as static sites). Zero server cost.
 
 ## Quick Start
 
@@ -41,7 +41,7 @@ Your site is now live at `https://<your-username>.github.io/gitshelf/`
    ([Create one here](https://github.com/settings/tokens/new?scopes=repo&description=GitShelf))
 3. Upload a file:
    - **`.pdf`** — Converted to a multi-chapter book via MinerU API
-   - **`.epub`** — Converted to a multi-chapter book via pandoc
+   - **`.epub`** — Stored as-is and read directly in the browser with TOC navigation
    - **`.md`** — Rendered directly as a document
    - **`.zip`** — Extracted as a static site (must contain `index.html`)
 4. Wait for GitHub Actions to process (progress shown in Actions tab)
@@ -68,7 +68,7 @@ Your site is now live at `https://<your-username>.github.io/gitshelf/`
 Upload content (browser → GitHub API → input/)
   → GitHub Actions runs scripts/process.py
   → .pdf:  MinerU API → Markdown → Split chapters → docs/books/{id}/
-  → .epub: pandoc → Markdown + media → Split chapters → docs/books/{id}/
+  → .epub: Store original EPUB + extract TOC → docs/books/{id}/
   → .md:   Copy to docs/articles/{id}/content.md
   → .zip:  Extract to docs/sites/{id}/
   → Build manifest → GitHub Pages deploys
@@ -90,7 +90,7 @@ python -m unittest discover -s tests/scripts -v # Python pipeline tests
 
 **What if MinerU stops being free?** Swap it by modifying `scripts/mineru_client.py`. Works with any PDF-to-Markdown tool.
 
-**Can I edit converted chapters?** Yes. Edit `.md` files in `docs/books/<id>/chapters/` and commit.
+**Can I edit converted chapters?** Yes for PDF-converted books. Edit `.md` files in `docs/books/<id>/chapters/` and commit. EPUB books are read from the original `book.epub`.
 
 **Can I upload a static site?** Yes. Package it as a `.zip` with `index.html` at the root and upload through the admin panel.
 

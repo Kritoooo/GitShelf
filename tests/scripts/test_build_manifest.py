@@ -21,24 +21,36 @@ def _create_book(
     book_id: str,
     title: str,
     source: str | None = None,
+    source_format: str | None = None,
+    toc_children: list[dict] | None = None,
+    raw_epub: bool = False,
 ) -> None:
     book_dir = books_dir / book_id
-    chapters_dir = book_dir / "chapters"
-    chapters_dir.mkdir(parents=True, exist_ok=True)
-    _write_json(book_dir / "toc.json", {"title": title, "children": []})
-    (chapters_dir / "01-intro.md").write_text("# Intro\n\nhello world\n", encoding="utf-8")
+    book_dir.mkdir(parents=True, exist_ok=True)
+    _write_json(book_dir / "toc.json", {"title": title, "children": toc_children or []})
 
-    if source:
+    if raw_epub:
+        (book_dir / "book.epub").write_bytes(b"epub-bytes")
+    else:
+        chapters_dir = book_dir / "chapters"
+        chapters_dir.mkdir(parents=True, exist_ok=True)
+        (chapters_dir / "01-intro.md").write_text("# Intro\n\nhello world\n", encoding="utf-8")
+
+    if source or source_format:
+        data = {
+            "id": book_id,
+            "type": "book",
+            "page_count": 8,
+            "created_at": "2026-03-25T10:00:00Z",
+            "updated_at": "2026-03-25T10:00:00Z",
+        }
+        if source:
+            data["source"] = source
+        if source_format:
+            data["source_format"] = source_format
         _write_json(
             book_dir / "meta.json",
-            {
-                "id": book_id,
-                "type": "book",
-                "source": source,
-                "page_count": 8,
-                "created_at": "2026-03-25T10:00:00Z",
-                "updated_at": "2026-03-25T10:00:00Z",
-            },
+            data,
         )
 
 
@@ -114,6 +126,7 @@ class BuildManifestTest(unittest.TestCase):
             self.assertEqual(public_item["title"], "Curated Two")
             self.assertEqual(public_item["type"], "book")
             self.assertEqual(public_item["source"], "source-two.pdf")
+            self.assertEqual(public_item["source_format"], "markdown-derived")
 
             catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
             by_id = {item["id"]: item for item in catalog["items"]}
@@ -122,6 +135,7 @@ class BuildManifestTest(unittest.TestCase):
             self.assertEqual(by_id["book-one"]["title"], "Curated One")
             self.assertEqual(by_id["book-one"]["visibility"], "hidden")
             self.assertEqual(by_id["book-one"]["source"], "source-one.pdf")
+            self.assertEqual(by_id["book-one"]["source_format"], "markdown-derived")
 
     def test_create_default_metadata_and_source_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -151,6 +165,60 @@ class BuildManifestTest(unittest.TestCase):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["items"][0]["source"], "book-three.pdf")
             self.assertEqual(manifest["items"][0]["type"], "book")
+            self.assertEqual(manifest["items"][0]["source_format"], "markdown-derived")
+
+    def test_raw_epub_books_use_toc_counts_and_epub_source_format(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            books_dir = root / "docs" / "books"
+            articles_dir = root / "docs" / "articles"
+            sites_dir = root / "docs" / "sites"
+            manifest_path = root / "docs" / "manifest.json"
+            metadata_path = root / "docs" / "catalog-metadata.json"
+            catalog_path = root / "docs" / "catalog.json"
+
+            _create_book(
+                books_dir,
+                book_id="epub-book",
+                title="EPUB Book",
+                source="epub-book.epub",
+                source_format="epub",
+                raw_epub=True,
+                toc_children=[
+                    {
+                        "title": "Chapter One",
+                        "slug": "chapter-one",
+                        "href": "OPS/chapter-1.xhtml",
+                        "children": [
+                            {
+                                "title": "Section One",
+                                "slug": "section-one",
+                                "href": "OPS/chapter-1.xhtml#section-1",
+                            }
+                        ],
+                    },
+                    {
+                        "title": "Chapter Two",
+                        "slug": "chapter-two",
+                        "href": "OPS/chapter-2.xhtml",
+                    },
+                ],
+            )
+
+            build_manifest(
+                books_dir=books_dir,
+                output_path=manifest_path,
+                catalog_metadata_path=metadata_path,
+                catalog_output_path=catalog_path,
+                articles_dir=articles_dir,
+                sites_dir=sites_dir,
+            )
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["items"][0]["chapters_count"], 3)
+            self.assertIsNone(manifest["items"][0]["word_count"])
+            self.assertEqual(manifest["items"][0]["source"], "epub-book.epub")
+            self.assertEqual(manifest["items"][0]["source_format"], "epub")
 
     def test_invalid_metadata_fails_loudly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
