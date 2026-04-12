@@ -112,6 +112,7 @@ function normalizeItemRecord(raw) {
     visibility: normalizeVisibility(m.visibility),
     chapters_count: normalizeNullableNumber(m.chapters_count),
     word_count: normalizeNullableNumber(m.word_count),
+    source_format: String(m.source_format || '').trim() || null,
     created_at: String(m.created_at || '').trim() || null,
     updated_at: String(m.updated_at || m.created_at || '').trim() || null,
     source: String(m.source || '').trim() || null,
@@ -151,6 +152,7 @@ function buildPublicManifest(items) {
     if (b.type === 'book' || !b.type) {
       result.chapters_count = b.chapters_count;
       result.word_count = b.word_count;
+      result.source_format = b.source_format || undefined;
     } else if (b.type === 'doc') {
       result.word_count = b.word_count;
     } else if (b.type === 'site') {
@@ -167,6 +169,7 @@ function serializeCatalog(items) {
     tags: (b.tags || []).slice(), featured: Boolean(b.featured),
     manual_order: b.manual_order, visibility: normalizeVisibility(b.visibility),
     source: b.source || '', entry: b.entry || undefined,
+    source_format: b.source_format || undefined,
     chapters_count: b.chapters_count, word_count: b.word_count,
     created_at: b.created_at, updated_at: b.updated_at,
   }))};

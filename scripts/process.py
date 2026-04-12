@@ -3,7 +3,7 @@
 
 Handles four content types from input/:
   - .pdf  → book (chapters via MinerU API)
-  - .epub → book (chapters via pandoc)
+  - .epub → book (raw EPUB + extracted TOC metadata)
   - .md   → article (single markdown document)
   - .zip  → site (static site extraction)
 
@@ -14,26 +14,20 @@ import argparse
 import hashlib
 import json
 import os
+import posixpath
 import re
 import shutil
-import subprocess
 import sys
-import tempfile
 import zipfile
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 try:
     from .build_manifest import build_manifest
 except ImportError:
     from build_manifest import build_manifest
-
-try:
-    from .split_markdown import split_by_headings
-    from .generate_structure import generate_book_structure
-except ImportError:
-    from split_markdown import split_by_headings
-    from generate_structure import generate_book_structure
 
 # Reuse PDF pipeline from convert.py
 try:
@@ -43,7 +37,6 @@ try:
         ensure_unique_content_id,
         generate_book_id,
         reconvert_from_cache,
-        _rewrite_chapter_image_paths,
         _write_failures,
         _remove_failure,
     )
@@ -54,14 +47,24 @@ except ImportError:
         ensure_unique_content_id,
         generate_book_id,
         reconvert_from_cache,
-        _rewrite_chapter_image_paths,
         _write_failures,
         _remove_failure,
     )
 
 FAILURES_FILENAME = "failures.json"
 BOOK_METADATA_FILENAME = "meta.json"
-EPUB_CACHE_DIR = Path("cache/epub")
+EPUB_BOOK_FILENAME = "book.epub"
+EPUB_CONTAINER_PATH = "META-INF/container.xml"
+EPUB_CONTAINER_NS = {"container": "urn:oasis:names:tc:opendocument:xmlns:container"}
+EPUB_PACKAGE_NS = {
+    "opf": "http://www.idpf.org/2007/opf",
+    "dc": "http://purl.org/dc/elements/1.1/",
+}
+EPUB_NAV_NS = {
+    "xhtml": "http://www.w3.org/1999/xhtml",
+    "epub": "http://www.idpf.org/2007/ops",
+}
+EPUB_NCX_NS = {"ncx": "http://www.daisy.org/z3986/2005/ncx/"}
 
 
 def _utc_now_iso() -> str:
@@ -100,6 +103,20 @@ def _read_existing_created_at(book_dir: Path, fallback: str) -> str:
     return str(existing.get("created_at", "")).strip() or fallback
 
 
+def _read_existing_epub_checksum(book_dir: Path) -> str | None:
+    meta_path = book_dir / BOOK_METADATA_FILENAME
+    if not meta_path.exists():
+        return None
+
+    try:
+        existing = json.loads(meta_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+    checksum = str(existing.get("epub_md5", "")).strip()
+    return checksum or None
+
+
 def _write_epub_metadata(
     book_dir: Path,
     *,
@@ -125,193 +142,292 @@ def _write_epub_metadata(
     )
 
 
-def _write_epub_cache(md5: str, epub_path: Path) -> None:
-    EPUB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(epub_path, EPUB_CACHE_DIR / f"{md5}.epub")
+def _slugify_epub(text: str) -> str:
+    normalized = text.strip().lower()
+    normalized = re.sub(r"[\s_]+", "-", normalized)
+    normalized = re.sub(r"[^\w-]+", "-", normalized, flags=re.UNICODE)
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-")
+    return normalized
 
 
-def _find_cached_epub(output_dir: Path, source_epub: str) -> tuple[str, str] | None:
-    """Return ``(book_id, md5)`` for a cached EPUB source."""
-    for meta_file in output_dir.glob(f"*/{BOOK_METADATA_FILENAME}"):
-        try:
-            meta = json.loads(meta_file.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
+@dataclass
+class EpubTocEntry:
+    title: str
+    href: str
+    children: list["EpubTocEntry"] = field(default_factory=list)
+
+
+def _normalize_epub_href(base_path: str, href: str) -> str:
+    value = str(href or "").strip()
+    if not value:
+        return ""
+
+    path_part, frag = value.split("#", 1) if "#" in value else (value, "")
+    resolved = posixpath.normpath(
+        posixpath.join(posixpath.dirname(base_path), path_part)
+    )
+    if frag:
+        return f"{resolved}#{frag}"
+    return resolved
+
+
+def _read_epub_package_path(zf: zipfile.ZipFile) -> str:
+    try:
+        container_xml = zf.read(EPUB_CONTAINER_PATH)
+    except KeyError as exc:
+        raise ValueError("EPUB is missing META-INF/container.xml") from exc
+
+    root = ET.fromstring(container_xml)
+    rootfile = root.find(".//container:rootfile", EPUB_CONTAINER_NS)
+    if rootfile is None:
+        raise ValueError("EPUB container.xml does not declare a package document")
+
+    full_path = str(rootfile.attrib.get("full-path", "")).strip()
+    if not full_path:
+        raise ValueError("EPUB package document path is empty")
+    return full_path
+
+
+def _parse_epub_nav_item(
+    li: ET.Element,
+    *,
+    nav_path: str,
+) -> EpubTocEntry | None:
+    anchor = li.find("./xhtml:a", EPUB_NAV_NS)
+    if anchor is None:
+        anchor = li.find("./xhtml:span", EPUB_NAV_NS)
+    if anchor is None:
+        return None
+
+    title = " ".join("".join(anchor.itertext()).split())
+    if not title:
+        return None
+
+    href = _normalize_epub_href(nav_path, anchor.attrib.get("href", ""))
+    children = []
+    child_list = li.find("./xhtml:ol", EPUB_NAV_NS)
+    if child_list is not None:
+        for child in child_list.findall("./xhtml:li", EPUB_NAV_NS):
+            parsed = _parse_epub_nav_item(child, nav_path=nav_path)
+            if parsed is not None:
+                children.append(parsed)
+
+    return EpubTocEntry(title=title, href=href, children=children)
+
+
+def _extract_epub_nav_toc(zf: zipfile.ZipFile, nav_path: str) -> list[EpubTocEntry]:
+    root = ET.fromstring(zf.read(nav_path))
+    toc_nav = None
+    for nav in root.findall(".//xhtml:nav", EPUB_NAV_NS):
+        nav_type = nav.attrib.get(f"{{{EPUB_NAV_NS['epub']}}}type", "") or nav.attrib.get("type", "")
+        if nav_type == "toc":
+            toc_nav = nav
+            break
+
+    if toc_nav is None:
+        return []
+
+    toc_list = toc_nav.find("./xhtml:ol", EPUB_NAV_NS)
+    if toc_list is None:
+        return []
+
+    entries: list[EpubTocEntry] = []
+    for item in toc_list.findall("./xhtml:li", EPUB_NAV_NS):
+        parsed = _parse_epub_nav_item(item, nav_path=nav_path)
+        if parsed is not None:
+            entries.append(parsed)
+    return entries
+
+
+def _parse_epub_ncx_point(point: ET.Element, *, ncx_path: str) -> EpubTocEntry | None:
+    label = point.find("./ncx:navLabel/ncx:text", EPUB_NCX_NS)
+    content = point.find("./ncx:content", EPUB_NCX_NS)
+    if label is None or content is None:
+        return None
+
+    title = " ".join("".join(label.itertext()).split())
+    if not title:
+        return None
+
+    href = _normalize_epub_href(ncx_path, content.attrib.get("src", ""))
+    children = []
+    for child in point.findall("./ncx:navPoint", EPUB_NCX_NS):
+        parsed = _parse_epub_ncx_point(child, ncx_path=ncx_path)
+        if parsed is not None:
+            children.append(parsed)
+
+    return EpubTocEntry(title=title, href=href, children=children)
+
+
+def _extract_epub_ncx_toc(zf: zipfile.ZipFile, ncx_path: str) -> list[EpubTocEntry]:
+    root = ET.fromstring(zf.read(ncx_path))
+    nav_map = root.find("./ncx:navMap", EPUB_NCX_NS)
+    if nav_map is None:
+        return []
+
+    entries: list[EpubTocEntry] = []
+    for point in nav_map.findall("./ncx:navPoint", EPUB_NCX_NS):
+        parsed = _parse_epub_ncx_point(point, ncx_path=ncx_path)
+        if parsed is not None:
+            entries.append(parsed)
+    return entries
+
+
+def _guess_epub_fallback_toc(
+    spine: list[str],
+    manifest_by_id: dict[str, dict[str, str]],
+    *,
+    package_path: str,
+) -> list[EpubTocEntry]:
+    entries: list[EpubTocEntry] = []
+    for item_id in spine:
+        manifest_item = manifest_by_id.get(item_id)
+        if not manifest_item:
             continue
 
-        if meta.get("source") == source_epub and meta.get("epub_md5"):
-            return meta_file.parent.name, str(meta["epub_md5"])
-    return None
-
-
-def _sanitize_pandoc_markdown(markdown: str) -> str:
-    """Remove pandoc EPUB wrapper elements that add noise to rendered chapters."""
-    sanitized = re.sub(
-        r"^\s*<span\b[^>]*>\s*</span>\s*$\n?",
-        "",
-        markdown,
-        flags=re.MULTILINE,
-    )
-    sanitized = re.sub(
-        r"^\s*<div\b[^>]*class=[\"'][^\"']*\bsection\b[^\"']*[\"'][^>]*>\s*$\n?",
-        "",
-        sanitized,
-        flags=re.MULTILINE,
-    )
-    sanitized = re.sub(r"^\s*</div>\s*$\n?", "", sanitized, flags=re.MULTILINE)
-    sanitized = re.sub(r"\n{3,}", "\n\n", sanitized).strip()
-    return sanitized + "\n" if sanitized else ""
-
-
-def _rewrite_book_asset_paths(
-    markdown: str,
-    source_prefixes: tuple[str, ...],
-    dest_prefix: str,
-) -> str:
-    """Rewrite relative markdown assets from one local prefix to another."""
-
-    def _normalize_path(raw: str) -> str:
-        value = str(raw or "").strip()
-        if (
-            not value
-            or value.startswith(("/", "#", "//", "data:"))
-            or re.match(r"^[a-z][a-z0-9+.-]*:", value, flags=re.IGNORECASE)
-        ):
-            return value
-
-        for prefix in source_prefixes:
-            if value.startswith(prefix):
-                return f"{dest_prefix}{value[len(prefix):]}"
-
-        return value
-
-    markdown = re.sub(
-        r"(!\[[^\]]*\]\()([^)]+)(\))",
-        lambda m: f"{m.group(1)}{_normalize_path(m.group(2))}{m.group(3)}",
-        markdown,
-    )
-    markdown = re.sub(
-        r'(<img\b[^>]*\bsrc=["\'])([^"\']+)(["\'][^>]*>)',
-        lambda m: f"{m.group(1)}{_normalize_path(m.group(2))}{m.group(3)}",
-        markdown,
-        flags=re.IGNORECASE,
-    )
-    return markdown
-
-
-def _select_chapter_level(markdown: str) -> tuple[list, int]:
-    """Pick a usable heading level for book chapters, preferring multi-chapter splits."""
-    fallback: tuple[list, int] | None = None
-    for level in (1, 2, 3):
-        try:
-            chapters = split_by_headings(markdown, level=level)
-        except ValueError:
+        href = _normalize_epub_href(package_path, manifest_item.get("href", ""))
+        media_type = manifest_item.get("media_type", "")
+        if media_type not in {"application/xhtml+xml", "text/html"}:
             continue
 
-        if fallback is None:
-            fallback = (chapters, level)
-
-        chapter_count = sum(1 for chapter in chapters if chapter.slug != "00-preface")
-        if chapter_count >= 2:
-            return chapters, level
-
-    if fallback is None:
-        raise ValueError("No headings found in EPUB-derived markdown.")
-
-    return fallback
+        title = PurePosixPath(href.split("#", 1)[0]).stem.replace("_", " ").replace("-", " ").strip()
+        entries.append(EpubTocEntry(title=title or item_id, href=href))
+    return entries
 
 
-def _copy_epub_media(work_dir: Path, book_dir: Path) -> int:
-    """Copy pandoc-extracted media into the book's images directory."""
-    media_dir = work_dir / "media"
-    if not media_dir.is_dir():
-        return 0
+def _build_epub_toc_data(epub_path: Path) -> tuple[str, list[EpubTocEntry]]:
+    try:
+        with zipfile.ZipFile(epub_path, "r") as zf:
+            package_path = _read_epub_package_path(zf)
+            package_root = ET.fromstring(zf.read(package_path))
+    except zipfile.BadZipFile as exc:
+        raise ValueError(f"Invalid EPUB file: {epub_path.name}: {exc}") from exc
 
-    images_dir = book_dir / "images"
-    copied = 0
-    for source in media_dir.rglob("*"):
-        if not source.is_file():
+    title = (
+        package_root.findtext(".//dc:title", default="", namespaces=EPUB_PACKAGE_NS).strip()
+        or epub_path.stem
+    )
+
+    manifest_by_id: dict[str, dict[str, str]] = {}
+    nav_path = ""
+    ncx_path = ""
+    for item in package_root.findall(".//opf:manifest/opf:item", EPUB_PACKAGE_NS):
+        item_id = str(item.attrib.get("id", "")).strip()
+        href = str(item.attrib.get("href", "")).strip()
+        media_type = str(item.attrib.get("media-type", "")).strip()
+        properties = str(item.attrib.get("properties", "")).strip()
+        if not item_id or not href:
             continue
-        destination = images_dir / source.relative_to(media_dir)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
-        copied += 1
-    return copied
 
+        manifest_by_id[item_id] = {
+            "href": href,
+            "media_type": media_type,
+            "properties": properties,
+        }
+        if "nav" in properties.split():
+            nav_path = _normalize_epub_href(package_path, href)
+        if media_type == "application/x-dtbncx+xml" and not ncx_path:
+            ncx_path = _normalize_epub_href(package_path, href)
 
-def _run_pandoc_epub(epub_path: Path, work_dir: Path) -> str:
-    """Convert EPUB to Markdown using pandoc within a temporary work directory."""
-    output_name = "book.md"
-    command = [
-        "pandoc",
-        str(epub_path.resolve()),
-        "-t",
-        "gfm",
-        "--wrap=none",
-        "--extract-media=.",
-        "-o",
-        output_name,
+    spine_element = package_root.find(".//opf:spine", EPUB_PACKAGE_NS)
+    spine_ids = [
+        str(itemref.attrib.get("idref", "")).strip()
+        for itemref in package_root.findall(".//opf:spine/opf:itemref", EPUB_PACKAGE_NS)
+        if str(itemref.attrib.get("idref", "")).strip()
     ]
 
-    try:
-        subprocess.run(
-            command,
-            check=True,
-            cwd=work_dir,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(
-            "pandoc is required to process EPUB files. Install pandoc locally "
-            "and in GitHub Actions."
-        ) from exc
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or exc.stdout or "").strip()
-        raise RuntimeError(
-            f"pandoc failed to convert {epub_path.name}: {detail[:200]}"
-        ) from exc
+    if spine_element is not None:
+        toc_id = str(spine_element.attrib.get("toc", "")).strip()
+        if toc_id and toc_id in manifest_by_id:
+            ncx_path = _normalize_epub_href(package_path, manifest_by_id[toc_id]["href"])
 
-    output_path = work_dir / output_name
-    if not output_path.exists():
-        raise RuntimeError(f"pandoc did not produce {output_name} for {epub_path.name}")
+    with zipfile.ZipFile(epub_path, "r") as zf:
+        toc_entries: list[EpubTocEntry]
+        if nav_path:
+            toc_entries = _extract_epub_nav_toc(zf, nav_path)
+        elif ncx_path:
+            toc_entries = _extract_epub_ncx_toc(zf, ncx_path)
+        else:
+            toc_entries = []
 
-    return output_path.read_text(encoding="utf-8")
+    if not toc_entries:
+        toc_entries = _guess_epub_fallback_toc(spine_ids, manifest_by_id, package_path=package_path)
+
+    if not toc_entries:
+        raise ValueError(f"Could not extract a table of contents from {epub_path.name}")
+
+    return title, toc_entries
 
 
-def _build_epub_book(epub_path: Path, output_dir: Path, book_id: str, title: str) -> int:
-    """Convert an EPUB source into the standard book directory structure."""
+def _serialize_epub_toc_entries(entries: list[EpubTocEntry]) -> list[dict]:
+    used: dict[str, int] = {}
+
+    def _convert(entry: EpubTocEntry) -> dict:
+        title_base = _slugify_epub(entry.title)
+        href_base = _slugify_epub(PurePosixPath(entry.href.split("#", 1)[0]).stem)
+        base = title_base or href_base or "section"
+        count = used.get(base, 0) + 1
+        used[base] = count
+        slug = base if count == 1 else f"{base}-{count}"
+
+        data = {
+            "title": entry.title,
+            "slug": slug,
+            "href": entry.href,
+        }
+        if entry.children:
+            data["children"] = [_convert(child) for child in entry.children]
+        return data
+
+    return [_convert(entry) for entry in entries]
+
+
+def _generate_epub_readme(title: str, toc_entries: list[dict]) -> str:
+    lines = [f"# {title}", "", "## Chapters", ""]
+    for entry in toc_entries:
+        lines.append(f"- {entry['title']}")
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "> **Disclaimer:** This content is provided for personal study and research "
+            "purposes only. All rights belong to the original authors and copyright holders. "
+            "This is not an authorized distribution. If you are the rights holder and wish "
+            "to have this content removed, please contact the repository owner.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _build_epub_book(epub_path: Path, output_dir: Path, book_id: str) -> tuple[str, list[dict]]:
+    """Store the original EPUB and generate lightweight TOC metadata."""
+    epub_bytes = epub_path.read_bytes()
+    title, raw_toc = _build_epub_toc_data(epub_path)
+    toc_entries = _serialize_epub_toc_entries(raw_toc)
+
     book_dir = output_dir / book_id
     if book_dir.exists():
         shutil.rmtree(book_dir)
+    book_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.TemporaryDirectory(prefix="gitshelf_epub_") as tmp_dir:
-        work_dir = Path(tmp_dir)
-        markdown = _run_pandoc_epub(epub_path, work_dir)
-        markdown = _sanitize_pandoc_markdown(markdown)
-        markdown = _rewrite_book_asset_paths(
-            markdown,
-            source_prefixes=("media/", "./media/"),
-            dest_prefix="images/",
-        )
-        markdown = _rewrite_chapter_image_paths(markdown, book_id)
+    (book_dir / EPUB_BOOK_FILENAME).write_bytes(epub_bytes)
+    (book_dir / "toc.json").write_text(
+        json.dumps({"title": title, "children": toc_entries}, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    (book_dir / "README.md").write_text(
+        _generate_epub_readme(title, toc_entries),
+        encoding="utf-8",
+    )
 
-        chapters, chapter_level = _select_chapter_level(markdown)
-        generate_book_structure(
-            book_id,
-            title,
-            chapters,
-            chapter_level=chapter_level,
-            output_dir=output_dir,
-        )
-        copied = _copy_epub_media(work_dir, book_dir)
-
-    return copied
+    return title, toc_entries
 
 
 def process_epub(epub_path: Path, output_dir: Path) -> None:
-    """Process a single .epub file into a multi-chapter book."""
+    """Process a single .epub file into a raw EPUB-backed book."""
     book_id = ensure_unique_content_id(_generate_id(epub_path), output_dir.parent, "book")
-    title = epub_path.stem
     md5 = _file_md5(epub_path)
     book_dir = output_dir / book_id
     timestamp = _utc_now_iso()
@@ -319,11 +435,8 @@ def process_epub(epub_path: Path, output_dir: Path) -> None:
 
     print(f"Processing EPUB: {epub_path.name} -> {book_id}")
 
-    copied_assets = _build_epub_book(epub_path, output_dir, book_id, title)
-    if copied_assets:
-        print(f"  Extracted {copied_assets} EPUB assets")
-
-    _write_epub_cache(md5, epub_path)
+    title, toc_entries = _build_epub_book(epub_path, output_dir, book_id)
+    print(f"  Extracted EPUB TOC with {len(toc_entries)} top-level entries")
 
     _write_epub_metadata(
         book_dir,
@@ -339,28 +452,39 @@ def process_epub(epub_path: Path, output_dir: Path) -> None:
 
 
 def reconvert_epub_from_cache(source_epub: str, output_dir: Path) -> None:
-    """Rebuild an EPUB-backed book from cached source bytes."""
-    cached = _find_cached_epub(output_dir, source_epub)
-    if not cached:
+    """Rebuild an EPUB-backed book from the stored raw EPUB source."""
+    book_dir: Path | None = None
+    for meta_file in output_dir.glob(f"*/{BOOK_METADATA_FILENAME}"):
+        try:
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+
+        if (
+            meta.get("source") == source_epub
+            and meta.get("source_format") == "epub"
+        ):
+            book_dir = meta_file.parent
+            break
+
+    if book_dir is None:
         raise FileNotFoundError(
-            f"No cached EPUB conversion found for {source_epub}. Re-upload the EPUB."
+            f"No stored EPUB source found for {source_epub}. Re-upload the EPUB."
         )
 
-    book_id, md5 = cached
-    cached_epub = EPUB_CACHE_DIR / f"{md5}.epub"
-    if not cached_epub.exists():
+    source_path = book_dir / EPUB_BOOK_FILENAME
+    if not source_path.exists():
         raise FileNotFoundError(
-            f"Cached EPUB missing for MD5 {md5}. Re-upload the EPUB."
+            f"Stored EPUB missing at {source_path}. Re-upload the EPUB."
         )
 
-    title = Path(source_epub).stem
-    book_dir = output_dir / book_id
+    book_id = book_dir.name
+    md5 = _file_md5(source_path)
     timestamp = _utc_now_iso()
     created_at = _read_existing_created_at(book_dir, timestamp)
-    print(f"Reconverting EPUB from cache: {source_epub} -> {book_id} (md5={md5})")
-    copied_assets = _build_epub_book(cached_epub, output_dir, book_id, title)
-    if copied_assets:
-        print(f"  Extracted {copied_assets} EPUB assets")
+    print(f"Reconverting EPUB from stored source: {source_epub} -> {book_id} (md5={md5})")
+    title, toc_entries = _build_epub_book(source_path, output_dir, book_id)
+    print(f"  Extracted EPUB TOC with {len(toc_entries)} top-level entries")
 
     _write_epub_metadata(
         book_dir,

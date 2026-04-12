@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 VALID_VISIBILITY = {"published", "hidden", "archived"}
+EPUB_BOOK_FILENAME = "book.epub"
 
 
 def _utc_now_iso() -> str:
@@ -152,6 +153,7 @@ def _to_public_item(entry: dict) -> dict:
     if entry["type"] == "book":
         result["chapters_count"] = entry.get("chapters_count")
         result["word_count"] = entry.get("word_count")
+        result["source_format"] = entry.get("source_format")
     elif entry["type"] == "doc":
         result["word_count"] = entry.get("word_count")
     elif entry["type"] == "site":
@@ -171,16 +173,33 @@ def _build_book_entry(book_dir: Path) -> dict:
     chapters_dir = book_dir / "chapters"
 
     md_files = sorted(chapters_dir.glob("*.md")) if chapters_dir.is_dir() else []
+    meta = _read_meta_json(book_dir / "meta.json")
+    source_format = str(meta.get("source_format", "")).strip()
+    if not source_format:
+        source_format = "epub" if (book_dir / EPUB_BOOK_FILENAME).exists() else "markdown-derived"
+
+    def _count_toc_entries(items: list[dict]) -> int:
+        total = 0
+        for item in items:
+            if item.get("slug") and not item.get("anchor"):
+                total += 1
+            children = item.get("children")
+            if isinstance(children, list):
+                total += _count_toc_entries(children)
+        return total
+
     chapters_count = len(md_files)
     word_count = sum(len(f.read_text(encoding="utf-8").split()) for f in md_files)
+    if chapters_count == 0:
+        chapters_count = _count_toc_entries(toc.get("children", []))
+        word_count = None
 
     directory_modified_at = datetime.fromtimestamp(
         book_dir.stat().st_mtime, tz=timezone.utc
     ).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    meta = _read_meta_json(book_dir / "meta.json")
-
-    source = str(meta.get("source", "")).strip() or f"{book_dir.name}.pdf"
+    default_ext = ".epub" if source_format == "epub" else ".pdf"
+    source = str(meta.get("source", "")).strip() or f"{book_dir.name}{default_ext}"
     updated_at = str(meta.get("updated_at", "")).strip() or directory_modified_at
     created_at = str(meta.get("created_at", "")).strip() or updated_at
 
@@ -190,6 +209,7 @@ def _build_book_entry(book_dir: Path) -> dict:
         "generated_title": toc["title"],
         "chapters_count": chapters_count,
         "word_count": word_count,
+        "source_format": source_format,
         "created_at": created_at,
         "updated_at": updated_at,
         "source": source,
@@ -288,6 +308,7 @@ def build_manifest(
                 "metadata_updated_at": metadata.get("metadata_updated_at"),
                 "chapters_count": generated["chapters_count"],
                 "word_count": generated["word_count"],
+                "source_format": generated["source_format"],
                 "created_at": generated["created_at"],
                 "updated_at": generated["updated_at"],
                 "source": metadata.get("source") or generated["source"],
