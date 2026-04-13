@@ -1,26 +1,9 @@
 {
   "items": [
     {
-      "id": "java并发编程实战",
-      "type": "book",
-      "title": "Java并发编程实战华章专业开发者书库",
-      "author": null,
-      "summary": null,
-      "tags": [],
-      "featured": false,
-      "source": "Java并发编程实战.epub",
-      "created_at": "2026-04-12T09:06:35Z",
-      "updated_at": "2026-04-12T09:06:35Z",
-      "chapters_count": 83,
-      "word_count": null,
-      "source_format": "epub"
-    },
-    {
       "id": "progit",
       "type": "book",
       "title": "progit",
-      "author": null,
-      "summary": null,
       "tags": [],
       "featured": false,
       "source": "progit.pdf",
@@ -34,8 +17,6 @@
       "id": "sandbox-3bc3-clock-app",
       "type": "site",
       "title": "sandbox_3bc3_clock-app",
-      "author": null,
-      "summary": null,
       "tags": [],
       "featured": false,
       "source": "sandbox_3bc3_clock-app.zip",
